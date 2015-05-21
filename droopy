@@ -1,3 +1,7 @@
+from __future__ import print_function
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
@@ -57,8 +61,8 @@
 #            * German translation by Michael.
 #   20080408 * First release.
 
-import BaseHTTPServer
-import SocketServer
+import http.server
+import socketserver
 import cgi
 import os
 import posixpath
@@ -72,7 +76,7 @@ import shutil
 import tempfile
 import socket
 import locale
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import base64
 
 LOGO = '''\
@@ -608,7 +612,7 @@ class DroopyFieldStorage(cgi.FieldStorage):
         return self.tmpfile
 
 
-class HTTPUploadHandler(BaseHTTPServer.BaseHTTPRequestHandler):
+class HTTPUploadHandler(http.server.BaseHTTPRequestHandler):
 
     protocol_version = 'HTTP/1.0'
     form_field = 'upfile'
@@ -622,7 +626,7 @@ class HTTPUploadHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         """
 
         # -- Parse accept-language header
-        if not self.headers.has_key("accept-language"):
+        if "accept-language" not in self.headers:
             a = []
         else:
             a = self.headers["accept-language"]
@@ -638,7 +642,7 @@ class HTTPUploadHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         # -- Choose the appropriate translation dictionary (default is english)
         lang = "en"
         for l in a:
-            if translations.has_key(l):
+            if l in translations:
                 lang = l
                 break
         dico = copy.copy(translations[lang])
@@ -661,7 +665,7 @@ class HTTPUploadHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if names:
             for name in names:
                 links += '<a href="/%s">%s</a>' % (
-                                urllib.quote(name.encode('utf-8')),
+                                urllib.parse.quote(name.encode('utf-8')),
                                 name)
             links = '<div id="files">' + links + '</div>'
         dico["files"] = links
@@ -691,7 +695,7 @@ class HTTPUploadHandler(BaseHTTPServer.BaseHTTPRequestHandler):
     @check_auth
     def do_GET(self):
         name = self.path.lstrip('/')
-        name = urllib.unquote(name)
+        name = urllib.parse.unquote(name)
         name = name.decode('utf-8')
 
         if picture != None and self.path == '/__droopy/picture':
@@ -766,7 +770,7 @@ class HTTPUploadHandler(BaseHTTPServer.BaseHTTPRequestHandler):
             else:
                 self.send_html(self.html("success"))
 
-        except Exception, e:
+        except Exception as e:
             self.log_message(repr(e))
             self.send_html(self.html("error"))
 
@@ -801,7 +805,7 @@ class HTTPUploadHandler(BaseHTTPServer.BaseHTTPRequestHandler):
         if publish_files:
             # os.listdir() returns a list of unicode strings when the
             # directory is passed as an unicode string itself.
-            names = [name for name in os.listdir(unicode(directory))
+            names = [name for name in os.listdir(str(directory))
                      if os.path.isfile(os.path.join(directory, name))
                      and not name.startswith(DroopyFieldStorage.TMPPREFIX)]
             names.sort(key=lambda s: s.lower())
@@ -811,8 +815,8 @@ class HTTPUploadHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 
     def handle(self):
         try:
-            BaseHTTPServer.BaseHTTPRequestHandler.handle(self)
-        except socket.error, e:
+            http.server.BaseHTTPRequestHandler.handle(self)
+        except socket.error as e:
             self.log_message(str(e))
             raise Abort()
 
@@ -820,14 +824,14 @@ class HTTPUploadHandler(BaseHTTPServer.BaseHTTPRequestHandler):
 class Abort(Exception): pass
 
 
-class ThreadedHTTPServer(SocketServer.ThreadingMixIn,
-                         BaseHTTPServer.HTTPServer):
+class ThreadedHTTPServer(socketserver.ThreadingMixIn,
+                         http.server.HTTPServer):
 
     def handle_error(self, request, client_address):
         # Override SocketServer.handle_error
         exctype = sys.exc_info()[0]
         if not exctype is Abort:
-            BaseHTTPServer.HTTPServer.handle_error(self,request,client_address)
+            http.server.HTTPServer.handle_error(self,request,client_address)
 
 
 # -- Options
@@ -885,7 +889,7 @@ def load_options():
         parse_args(cmd)
         f.close()
         return True
-    except IOError, e:
+    except IOError as e:
         return False
 
 
@@ -909,8 +913,8 @@ def parse_args(cmd=None):
                                        ["picture=","message=", "directory=",
                                         "auth=", "ssl=", "chmod=", "help",
                                         "save-config", "delete-config", "dl"])
-    except Exception, e:
-        print e
+    except Exception as e:
+        print(e)
         sys.exit(1)
 
     for o, a in opts:
@@ -918,7 +922,7 @@ def parse_args(cmd=None):
             if os.path.exists(a):
                 picture = fullpath(a)
             else:
-                print "Picture not found: '%s'" % a
+                print("Picture not found: '%s'" % a)
 
         elif o in ["-m", "--message"]:
             message = a
@@ -933,9 +937,9 @@ def parse_args(cmd=None):
             try:
                 filename = configfile()
                 os.remove(filename)
-                print 'Deleted ' + filename
-            except Exception, e:
-                print e
+                print('Deleted ' + filename)
+            except Exception as e:
+                print(e)
             sys.exit(0)
 
         elif o in ['--dl']:
@@ -943,14 +947,14 @@ def parse_args(cmd=None):
 
         elif o in ['-a', '--auth']:
             if ':' not in a:
-                print "Error: authentication credentials must be " \
-                      "specified as USER:PASSWORD"
+                print("Error: authentication credentials must be " \
+                      "specified as USER:PASSWORD")
                 sys.exit(1)
             auth = a
 
         elif o in ['--ssl']:
             if not os.path.isfile(a):
-                print "PEM file not found: '%s'" % a
+                print("PEM file not found: '%s'" % a)
                 sys.exit(1)
             certfile = fullpath(a)
 
@@ -958,12 +962,12 @@ def parse_args(cmd=None):
             try:
                 file_mode = int(a, 8)
             except ValueError:
-                print "Invalid octal value passed to chmod option: '%s'" % a
+                print("Invalid octal value passed to chmod option: '%s'" % a)
                 sys.exit(1)
 
 
         elif o in ['-h', '--help']:
-            print USAGE
+            print(USAGE)
             sys.exit(0)
 
     # port number
@@ -971,7 +975,7 @@ def parse_args(cmd=None):
         if args[0:]:
             port = int(args[0])
     except ValueError:
-        print args[0], "is not a valid port number"
+        print(args[0], "is not a valid port number")
         sys.exit(1)
 
 
@@ -986,7 +990,7 @@ def run():
         try:
             import ssl
         except:
-            print "Error: Could not import module 'ssl', exiting."
+            print("Error: Could not import module 'ssl', exiting.")
             sys.exit(2)
         httpd.socket = ssl.wrap_socket(httpd.socket, certfile=certfile,
                                        server_side=True)
@@ -994,27 +998,27 @@ def run():
 
 
 if __name__ == '__main__':
-    print LOGO
+    print(LOGO)
 
     config_found = load_options()
     parse_args()
 
     if config_found:
-        print 'Configuration found in %s' % configfile()
+        print('Configuration found in %s' % configfile())
     else:
-        print "No configuration file found."
+        print("No configuration file found.")
 
     if must_save_options:
         save_options()
-        print "Options saved in %s" % configfile()
+        print("Options saved in %s" % configfile())
 
     proto = 'https' if certfile else 'http'
-    print "Files will be uploaded to %s" % directory
-    print
+    print("Files will be uploaded to %s" % directory)
+    print()
     print ("HTTP server running... Check it out at %s://localhost:%d"
            % (proto, port))
     try:
         run()
     except KeyboardInterrupt:
-        print '^C received, shutting down server'
+        print('^C received, shutting down server')
         # some threads may run until they terminate
